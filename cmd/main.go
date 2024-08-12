@@ -4,32 +4,26 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
-	"github.com/rkmangalp/bat-bet-go/internal/handlers"
+	"github.com/rkmangalp/bat-bet-go/internal/config"
+	"github.com/rkmangalp/bat-bet-go/internal/routes"
 	"github.com/rkmangalp/bat-bet-go/internal/services"
 )
 
 func main() {
+	// Load configuration
+	config.LoadConfig("config/config.json")
+
 	// Initialize services
 	playerService := services.NewPlayerService()
 	matchService := services.NewMatchService()
 	scoringService := services.NewScoringService()
 
-	// Initialize handlers
-	playerHandler := handlers.NewPlayerHandler(playerService)
-	matchHandler := handlers.NewMatchHandler(matchService, scoringService)
-	resultHandler := handlers.NewResultHandler(matchService, scoringService)
-
-	// Setup router
-	router := mux.NewRouter()
-	router.HandleFunc("/players", playerHandler.AddPlayer).Methods("POST")
-	router.HandleFunc("/matches", matchHandler.ScheduleMatch).Methods("POST")
-	router.HandleFunc("/matches/{id}/result", resultHandler.UpdateResult).Methods("PUT")
-	router.HandleFunc("/scoreboard", playerHandler.GetScoreboard).Methods("GET")
+	// Initialize router
+	router := routes.NewRouter(playerService, matchService, scoringService)
 
 	// Start server
-	log.Println("Starting server on :8080")
-	err := http.ListenAndServe(":8080", router)
+	log.Printf("Starting server on port %s", config.AppConfig.Port)
+	err := http.ListenAndServe(":"+config.AppConfig.Port, router)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}

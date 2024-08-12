@@ -1,27 +1,47 @@
 package services
 
-import "github.com/rkmangalp/bat-bet-go/internal/models"
+import (
+	"errors"
+	"sync"
 
-type ScoringService struct{}
+	"github.com/rkmangalp/bat-bet-go/internal/models"
+)
 
-func NewScoringService() *ScoringService {
-	return &ScoringService{}
+// ScoringService provides operations related to scoring and balances
+type ScoringService struct {
+	playerService *PlayerService
+	mu            sync.Mutex
 }
 
-func (ss *ScoringService) UpdateScores(match models.Match, result string) {
-	if result == "WIN1_2" {
-		match.Player1.Score++
-		match.Player2.Score++
-		match.Player3.Score--
-		match.Player4.Score--
-	} else {
-		match.Player3.Score++
-		match.Player4.Score++
-		match.Player1.Score--
-		match.Player2.Score--
+// NewScoringService creates a new ScoringService
+func NewScoringService(ps *PlayerService) *ScoringService {
+	return &ScoringService{
+		playerService: ps,
 	}
-	match.Player1.Balance += float64(match.Player1.Score) * match.BetAmount
-	match.Player2.Balance += float64(match.Player2.Score) * match.BetAmount
-	match.Player3.Balance += float64(match.Player3.Score) * match.BetAmount
-	match.Player4.Balance += float64(match.Player4.Score) * match.BetAmount
+}
+
+// UpdateScores updates the scores and balances of players based on match results
+func (ss *ScoringService) UpdateScores(result *models.Result) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	for _, winnerID := range result.Winners {
+		player, err := ss.playerService.GetPlayerByID(winnerID)
+		if err != nil {
+			return errors.New("error updating winner's score: " + err.Error())
+		}
+		player.Score += 1
+		player.Balance += result.BetAmount
+	}
+
+	for _, loserID := range result.Losers {
+		player, err := ss.playerService.GetPlayerByID(loserID)
+		if err != nil {
+			return errors.New("error updating loser's score: " + err.Error())
+		}
+		player.Score -= 1
+		player.Balance -= result.BetAmount
+	}
+
+	return nil
 }
